@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<unload unload_date="2023-11-16 16:20:50">
+<sys_script_fix action="INSERT_OR_UPDATE">
+<before>false</before>
+<description>This script is expected to scan the entire instance in 30-seconds or less, though it may take up to 1-minute.
+
+-------------------------------------------------
+Example Progress Worker Output
+/sys_progress_worker_list.do?sysparm_query=name%3DFix%20Script%3A%20Find%20a%20Sys_Id
+-------------------------------------------------
+*** Script: 	0	Sys_id	sys_metadata	
+*** Script: 	1	Table	dev121208.service-now.com/sys_metadata_list.do	
+*** Script: 	2	Record	dev121208.service-now.com/sys_metadata?sys_id=ba55c17497313110791cf9271153af4c	
+*** Script: 	3	Sys_id	sys_script_fix	
+*** Script: 	4	Table	dev121208.service-now.com/sys_script_fix_list.do	
+*** Script: 	5	Record	dev121208.service-now.com/sys_script_fix?sys_id=ba55c17497313110791cf9271153af4c	
+*** Script: 	6	# times Sys_id found	2	</description>
+<name>Find a Sys_Id</name>
+<record_for_rollback>true</record_for_rollback>
+<script><![CDATA[var arrResults = [];
+
+var strFindSysId = 'ba55c17497313110791cf9271153af4c';
+
+fnFindATable(strFindSysId);
+
+function fnFindATable(strFindSysId) {
+    var intTableCount = 0;
+	
+	// Avoid certail tables due to errors, relevance, and/or performance
+	var rgxAvoidTables = /^(ts_|v_|sn_hr_|sys_rollback_|_log\d)/;
+	/* Need to avoid; an error may be thrown and break the script if these are included
+		Shadow & Virtual tables
+			ts_|v_
+		HR related tables that are encrypted
+			sn_hr_
+		Rollback/Restoration tables
+			sys_rollback_
+    */
+	/* Want to avoid (usually for performance)
+		Most Logging tables
+			_log\d
+	*/
+	/* No longer need to avoid
+		Performance Analytics tables when the instance does not have the related licensing
+			This may still error on older instances
+			pa_|
+	*/
+	
+    var grSysDbObject = new GlideRecord('sys_db_object');
+    
+	// If the Client instance is older than Application Scopes and throws Cross Scope errors, use this to avoid Cross Scope Access errors 
+	// grSysDbObject.addQuery('sys_scope', '=', 'global'); 
+	
+	grSysDbObject.query();
+    while (grSysDbObject.next()) {
+        try {
+            var strTableName = grSysDbObject.getValue('name');
+            if (strTableName && !strTableName.match(rgxAvoidTables) && grSysDbObject.canRead()) {
+                if (fnValidateTable(strTableName, strFindSysId)) {
+                    intTableCount += 1;
+                }
+            }
+        } catch (error) {
+
+        }
+    }
+    arrResults.push('# times Sys_id found\t' + intTableCount);
+}
+
+function fnValidateTable(strTableName, strFindSysId) {
+    var grSysDictionary = new GlideRecord('sys_dictionary');
+    grSysDictionary.addQuery('name', '=', strTableName);
+    grSysDictionary.addQuery('internal_type', '=', 'GUID');
+    grSysDictionary.query();
+    while (grSysDictionary.next()) {
+        if (fnFindASysId(strTableName, strFindSysId, grSysDictionary.getValue('element'))) {
+            return true;
+        }
+    }
+}
+
+function fnFindASysId(strTableName, strFindSysId, strElement) {
+    var grInputTable = new GlideRecord(strTableName);
+    grInputTable.addQuery(strElement, '=', strFindSysId);
+    grInputTable.query();
+    while (grInputTable.next()) {
+        arrResults.push('Sys_id\t' + strTableName);
+        arrResults.push('Table\t' + gs.getProperty('instance_name') + '.service-now.com/' + strTableName + '_list.do');
+        arrResults.push('Record\t' + gs.getProperty('instance_name') + '.service-now.com/' + strTableName + '?sys_id=' + strFindSysId);
+        return true;
+    }
+}
+
+arrResults.forEach(function(element, index, array) {
+    gs.print('\t' + index + '\t' + element + '\t');
+});]]></script>
+<sys_class_name>sys_script_fix</sys_class_name>
+<sys_created_by>admin</sys_created_by>
+<sys_created_on>2023-10-07 21:05:14</sys_created_on>
+<sys_id>ba55c17497313110791cf9271153af4c</sys_id>
+<sys_mod_count>7</sys_mod_count>
+<sys_name>Find a Sys_Id</sys_name>
+<sys_package display_value="Global" source="global">global</sys_package>
+<sys_policy/>
+<sys_scope display_value="Global">global</sys_scope>
+<sys_update_name>sys_script_fix_ba55c17497313110791cf9271153af4c</sys_update_name>
+<sys_updated_by>admin</sys_updated_by>
+<sys_updated_on>2023-11-16 16:11:48</sys_updated_on>
+<unloadable>false</unloadable>
+</sys_script_fix>
+</unload>
